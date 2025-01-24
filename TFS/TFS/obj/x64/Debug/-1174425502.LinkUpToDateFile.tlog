@@ -1,1 +1,0 @@
-g++ -o "/home/czf/projects/TFS/bin/x64/Debug/TFS.out" -Wl,--no-undefined -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack /home/czf/projects/TFS/obj/x64/Debug/main.o /home/czf/projects/TFS/obj/x64/Debug/mmap_file.o
