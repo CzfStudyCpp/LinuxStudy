@@ -12,8 +12,8 @@ namespace linux_study
 			FileOperation(const std::string &file_name,const int open_flags=O_RDWR|O_LARGEFILE);
 			~FileOperation();
 			
-			int open_file();
-			bool close_file();
+			int open_file();//打开文件
+			bool close_file();//关闭文件
 			int flush_file();//写入硬盘，将内存缓冲区数据写入磁盘
 			
 			int unlink_file();//删除文件

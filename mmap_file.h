@@ -3,18 +3,12 @@
 #define LINUX_HEADFILE
 #include<stdint.h>
 #include<unistd.h>
+#include"Public.h"
 namespace linux_study
 {
 		namespace largefile
 		{
-			//映射选项
-			struct MMapOption
-			{
-				int32_t max_mmap_size_;
-				int32_t first_mmap_size_;
-				int32_t per_mmap_size_;
 
-			};
 				
 			class MMapFile
 			{

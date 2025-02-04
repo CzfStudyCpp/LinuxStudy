@@ -95,6 +95,12 @@ namespace linux_study{
 			if(fd<0)return fd;
 			
 			return fsync(fd);
+			
+			// 使用fsync()系统调用，强制将文件描述符关联的所有数据（含元数据）同步写入磁盘。
+
+			// 同步阻塞操作，等待磁盘写入完成才返回。
+
+			// 适用场景：常规文件I/O操作的持久化保证。
 		}
 		
 		int FileOperation::unlink_file(){
@@ -111,6 +117,7 @@ namespace linux_study{
 			int i=0;
 			while(left>0){
 				++i;
+				//超出限制的磁盘访问次数
 				if(i>=MAX_DISKTIMES){
 				    break;
 				 }

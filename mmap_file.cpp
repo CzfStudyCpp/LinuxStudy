@@ -48,6 +48,12 @@ namespace linux_study
 			}
 			//没有同步，则不需要执行，也相当于同步了
 			return true;
+			
+			// 使用msync()系统调用，配合MS_ASYNC标志，异步刷新内存映射区域的修改到磁盘。
+
+			// 异步非阻塞操作，立即返回不等待写入完成。
+
+			// 适用场景：内存映射文件的高效批量更新。
 		
 		}
 		
@@ -68,7 +74,7 @@ namespace linux_study
 				return false;
 			}
 			
-			
+			//将文件映射到内存，并返回数据地址
 			data=mmap(0,size,flags,MAP_SHARED,fd,0);
 			
 			if(MAP_FAILED==data){
@@ -86,6 +92,7 @@ namespace linux_study
 			}
 		void* MMapFile::get_data()const
 			{
+				printf("get the mapped data successed\n,fd:%d maped size:%d,data:%p\n",fd,size,data);
 				return data;
 			}
 			
