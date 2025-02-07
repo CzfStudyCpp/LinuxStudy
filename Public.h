@@ -28,7 +28,17 @@ namespace linux_study{
 		const int32_t EXIT_INDEX_CORRUPT_ERROR=-8015;//the index file is corrupt;
 		const int32_t EXIT_BLOCKID_CONFLICT_ERROR=-8016; //the index block id is conflict
 		const int32_t EXIT_BUCKET_CONFIGURE_ERROR=-8017; //the bucket size error
+		const int32_t EXIT_BLOCKID_ZERO_ERROR=-8018;
+		const int32_t EXIT_INDEX_NOT_LOADED_ERROR=-81; //the index file is not loaded when remove
+		const int32_t EXIT_META_NOT_FOUND_ERROR=-82;
 		
+		enum OperType{
+			
+			C_OPER_INSERT=1,
+			C_OPER_DELETE=2,
+			
+			
+		};
 		//映射选项
 		struct MMapOption
 		{
@@ -61,7 +71,7 @@ namespace linux_study{
 				       && del_file_count == rhs.del_file_count && del_size == rhs.del_size && seq_no == rhs.seq_no;
 			}
 		};
-		//文件哈希索引块
+		//文件元信息哈希索引块
 		struct MetaInfo{
 			public:
 			  MetaInfo(){
@@ -139,15 +149,17 @@ namespace linux_study{
 				uint64_t file_id;
 			
 				struct{
-					int32_t inner_offset;
-					int32_t size;
+					//在主块文件里元信息
+					int32_t inner_offset;//偏移量
+					int32_t size;  //大小
 				}location;
 				
-				int32_t next_meta_offset;
+				int32_t next_meta_offset;//当前哈希链下一个节点在索引文件中的偏移量
+
 			
 			private:
 			   void init(){
-				   file_id=0;
+				   file_id=0;  
 				   location.inner_offset=0;
 				   location.size=0;
 				   next_meta_offset=0;

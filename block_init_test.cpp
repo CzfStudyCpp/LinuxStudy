@@ -32,6 +32,22 @@ int main(int argc,char **argv){//argc 表示参数数量，argv存放参数 rm -
 		exit(-1);
 	}
 	int ret=largefile::TFS_SUCCESS;//反馈信息
+	
+	//create index file
+	//创建索引文件比较复杂，可以先进行创建索引文件
+	largefile::IndexHandle*index_handle =new largefile::IndexHandle(".",block_id);
+	
+	if(debug)printf("init index...\n");
+	
+	ret=index_handle->creat(block_id,bucket_size,mmap_option);
+	
+	if(ret!=largefile::TFS_SUCCESS){
+		fprintf(stderr,"create index with block id :%d failed，reason:%s.\n",block_id,strerror(errno));
+		
+		delete index_handle;
+		exit(-3);
+	}
+	
 	//生成主块文件
 	std::stringstream tmp_stream;
 	tmp_stream<<"."<<largefile::MAINBLOCK_DIR_PREFIX<<block_id;
@@ -45,21 +61,18 @@ int main(int argc,char **argv){//argc 表示参数数量，argv存放参数 rm -
 		fprintf(stderr,"create main block %s failed.reason:%s\n",
 		mainBlock_path.c_str(),strerror(errno));
 		delete mainBlock;
+		//删除索引文件
+		index_handle->remove(block_id);
 		exit(-2);
 	}
+	//关闭主块文件
+	mainBlock->close_file();
+	index_handle->flush();
 	
-	//create index file
-	largefile::IndexHandle*index_handle =new largefile::IndexHandle(".",block_id);
-	
-	if(debug)printf("init index...\n");
-	
-	ret=index_handle->creat(block_id,bucket_size,mmap_option);
-	
-	if(ret!=largefile::TFS_SUCCESS){
-		fprintf(stderr,"create index with block id :%d failed，reason:%s.\n",block_id,strerror(errno));
-		delete mainBlock;
-		delete index_handle;
-		exit(-3);
-	}
+	delete mainBlock;
+	delete index_handle;
+      
+	mainBlock=nullptr;
+	index_handle=nullptr;
 	return 0;
 }

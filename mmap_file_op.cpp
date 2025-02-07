@@ -39,7 +39,7 @@ namespace linux_study{
 		}
 		void *MMapFileOperation::get_map_data()const{
 			if(is_mapped&&map_file!=NULL){
-				printf("get map data successed\n");
+				//printf("get map data successed\n");
 				return map_file->get_data();
 			}
 		
@@ -91,9 +91,14 @@ namespace linux_study{
 				if(map_file->sync_file()){
 					return linux_study::largefile::TFS_SUCCESS;
 				}
-				else return linux_study::largefile::TFS_ERROR;
+				
+				else{
+                    fprintf(stderr,"the file is mapped but flush the file happend errors\n");
+					return linux_study::largefile::TFS_ERROR;
+				}
 			}
 			//没有映射但是有可能在内存中
+			//fprintf(stderr,"the file is not mapped and flush the file \n");
 			return FileOperation::flush_file();
 		}
 	}

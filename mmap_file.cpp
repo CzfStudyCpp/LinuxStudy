@@ -92,7 +92,8 @@ namespace linux_study
 			}
 		void* MMapFile::get_data()const
 			{
-				printf("get the mapped data successed\n,fd:%d maped size:%d,data:%p\n",fd,size,data);
+				
+				//printf("get the mapped data successed\n,fd:%d maped size:%d,data:%p\n",fd,size,data);
 				return data;
 			}
 			

@@ -2,6 +2,7 @@
 #include"file_op.h"
 #include"Public.h"
 
+const static int debug=1;
 namespace linux_study{
 	namespace largefile{
 	// file_op.cpp
@@ -46,15 +47,17 @@ namespace linux_study{
 			//当没有调用打开文件函数之前，也可以获取
 			int fd=check_file();
 			if(fd<0){
+				fprintf(stderr,"the fd for the file is NULL with the fd :%d\n",fd);
 				return -1;
 			}
 			struct stat statbuf;
 			
 			//由fd取得文件状态，stat是文件状态的元信息结构体，
 			if(fstat(fd,&statbuf)!=0){//将fd的值复制到statbuf中，成功则返回0，失败返回-1
+			    fprintf(stderr,"get the file stat failed with the fd :%d\n",fd);
 				return -1;
 			}
-			
+			printf("get the file stat is success with the fd : %d,and the stat.size is : %ld\n",fd,statbuf.st_size);
 			return statbuf.st_size;
 			
 			
@@ -89,11 +92,15 @@ namespace linux_study{
 		int FileOperation::flush_file(){
 			//检查是否同步，如果文件是同步状态打开，那么它的操作都是同步写回磁盘的，那么就不需要刷回磁盘操作
 			if(open_flags&&O_SYNC){
-				return 0;
+				if(debug)fprintf(stderr,"the flushing file the open is true and the O_SYNC is opened\n");
+				return linux_study::largefile::TFS_SUCCESS;
 			}
 			int fd=check_file();
-			if(fd<0)return fd;
-			
+			if(fd<0){
+				if(debug)fprintf(stderr,"the FileOperation::flush_file  the fd is <0:the fd is :%d\n",fd);
+				return fd;
+			}
+            if(debug)fprintf(stderr,"the FileOperation::flush_file,the function fsync() runs and the fd is >=0:the fd is :%d\n",fd);			
 			return fsync(fd);
 			
 			// 使用fsync()系统调用，强制将文件描述符关联的所有数据（含元数据）同步写入磁盘。
