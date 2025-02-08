@@ -168,7 +168,7 @@ namespace linux_study{
 				}
 				
 				is_load=true;
-				if(debug)printf("load block id:%d index successful. data file size:%d.index file offset:%d,bucket size:%d,free head offset:%d ,seq_no:%d,size:%d,file count:%d,del_size:%d,del_file_count:%d,version:%d\n",
+				if(debug)printf("load block id:%d index successful. data file offset:%d.index file offset:%d,bucket size:%d,free head offset:%d ,seq_no:%d,size:%d,file count:%d,del_size:%d,del_file_count:%d,version:%d\n",
 			                 logic_block_id, index_header()->data_file_offset, index_header()->index_file_offset, 
 							 index_header()->bucket_size,index_header()->free_head_offset,
 							 blockInfo()->seq_no, blockInfo()->size, blockInfo()->file_count, blockInfo()->del_size,
@@ -208,7 +208,7 @@ namespace linux_study{
 		}
 		
 		int IndexHandle::write_segment_meta(const uint64_t key,MetaInfo & meta){
-			int current_offset=0;
+			int32_t current_offset=0;
 			int32_t previous_offset=0;
 			
 			
@@ -226,14 +226,114 @@ namespace linux_study{
 			ret=hash_insert(key,previous_offset,meta);//采取key，offset，更直观一些
 			return ret;
 		}
+		
+		int IndexHandle::read_segment_meta(const uint64_t key,MetaInfo & meta){
+			int32_t current_offset=0;
+			int32_t previous_offset=0;
+			
+			//key是否存在
+			int ret=hash_find(key,current_offset,previous_offset);
+			if(ret==linux_study::largefile::TFS_SUCCESS){
+				ret=file_op->pread_file(reinterpret_cast<char*>(&meta),sizeof(MetaInfo),current_offset);
+				if(ret!=linux_study::largefile::TFS_SUCCESS){
+					fprintf(stderr,"in the read_segment_meta,the pread_filef failed with the ret:%d,key :%lu",ret,key);
+					return ret;
+				}
+				return ret;
+			}else{
+				fprintf(stderr,"in the read_segment_meta,the key is not found or the hash_find fail with the ret:%d,key :%lu",ret,key);
+				return ret;
+			}
+			
+			
+		}
+		
+		int IndexHandle::remove_segment_meta(const uint64_t key){
+			int32_t current_offset=0;
+			int32_t previous_offset=0;
+			
+			//key是否存在
+			int ret=hash_find(key,current_offset,previous_offset);
+			if(ret!=linux_study::largefile::TFS_SUCCESS){
+				fprintf(stderr,"in removing index meta function,the key is not found with the key:%lu\n",key);
+				return ret;
+			}
+			
+			MetaInfo meta;
+			
+			ret=file_op->pread_file(reinterpret_cast<char*>(&meta),sizeof(MetaInfo),current_offset);
+			if(ret!=linux_study::largefile::TFS_SUCCESS){
+					fprintf(stderr,"in the remove_segment_meta,the pread_file of the current_offset :%d failed with the ret:%d,key :%lu",current_offset,ret,key);
+					return ret;
+			}
+			int32_t next_pos=meta.get_next_meta_offset();
+			
+			if(previous_offset==0){
+				//找到桶的位置
+				int32_t slot=static_cast<uint32_t>(key)%bucketSize();
+				
+				bucket_slot()[slot]=next_pos;//修正下一个节点的位置
+			}else{
+				
+				MetaInfo previous_meta;
+				ret=file_op->pread_file(reinterpret_cast<char*>(&previous_meta),sizeof(MetaInfo),previous_offset);//读取上一个节点
+				if(ret!=linux_study::largefile::TFS_SUCCESS){
+					fprintf(stderr,"in the remove_segment_meta,the pread_file of the previous_offset :%d failed with the ret:%d,key :%lu",previous_offset,ret,key);
+					return ret;
+				}
+				//修改要删除的节点的上一个节点指向当前节点的下一个节点
+				previous_meta.set_next_meta_offset(next_pos);
+				
+				ret=file_op->pwrite_file(reinterpret_cast<char*>(&previous_meta),sizeof(MetaInfo),previous_offset);//持久化存储
+				if(ret!=linux_study::largefile::TFS_SUCCESS){
+					fprintf(stderr,"in the remove_segment_meta,the pwrite_file of the previous_offset :%d failed with the ret:%d,key :%lu",previous_offset,ret,key);
+					return ret;
+				}
+			}
+			//前插法加入删除节点
+			//把删除的节点加入自由可用节点链表
+			meta.set_next_meta_offset(get_free_head_offset());
+			
+			ret=file_op->pwrite_file(reinterpret_cast<char*>(&meta),sizeof(MetaInfo),current_offset);//持久化存储
+			if(ret!=linux_study::largefile::TFS_SUCCESS){
+					fprintf(stderr,"in the remove_segment_meta,the pwrite_file of the current_offset :%d failed with the ret:%d,key :%lu",current_offset,ret,key);
+					return ret;
+			}
+			index_header()->free_head_offset=current_offset;
+			
+			
+			//更新块信息
+			update_block_info(C_OPER_DELETE,meta.get_size());
+			
+			if(debug)printf("delete_meta successfully and the next_pos is:%d,the new free_head_offset also the current_offset is:%d\n",next_pos,index_header()->free_head_offset);
+			return linux_study::largefile::TFS_SUCCESS;
+			
+		}
 		int32_t IndexHandle::hash_insert(const uint64_t key,int32_t previous_offset,MetaInfo &meta){
-			int32_t slot=static_cast<uint32_t>(key%bucketSize());
+			int32_t slot=static_cast<uint32_t>(key)%bucketSize();
 			MetaInfo tmp_metaInfo;
 			int ret=linux_study::largefile::TFS_SUCCESS;
-			//找到存放当前节点的对应的偏移量
-			int32_t current_offset =index_header()->index_file_offset;
-			index_header()->index_file_offset+=sizeof(MetaInfo);
 			
+			int32_t current_offset=0;
+			//找到被删除的可重用的节点
+			int32_t free_head_offset_=get_free_head_offset();
+			if(free_head_offset_!=0){
+				ret=file_op->pread_file(reinterpret_cast<char*>(&tmp_metaInfo),sizeof(MetaInfo),free_head_offset_);
+				
+				if(ret!=linux_study::largefile::TFS_SUCCESS){
+					fprintf(stderr,"in the hash_insert,the pread_file of the free_head_offset_ :%d failed with the ret:%d,key :%lu",free_head_offset_,ret,key);
+					return ret;
+				}
+				 current_offset=get_free_head_offset();
+				 index_header()->free_head_offset=tmp_metaInfo.get_next_meta_offset();
+				 
+				 if(debug)printf("reuse free meta,the reuse current_offset is:%d,the new free_head_offset is:%d\n",current_offset,index_header()->free_head_offset);
+			}else{
+				//找到存放当前节点的对应的偏移量
+			    current_offset =index_header()->index_file_offset;
+			    index_header()->index_file_offset+=sizeof(MetaInfo);
+			
+			}
 			//将MetaInfo节点写入索引文件中
 			meta.set_next_meta_offset(0);
 			
@@ -274,7 +374,7 @@ namespace linux_study{
 			current_offset=0;
 			previous_offset=0;
 			//查找key存放的桶(slot)的位置
-			int32_t slot=(static_cast<int32_t>(key%bucketSize()));//slot达不到那么大，选择32，一般情况下不会超出，因为一个主块的大小是限定的
+			int32_t slot=(static_cast<int32_t>(key)%bucketSize());//slot达不到那么大，选择32，一般情况下不会超出，因为一个主块的大小是限定的
 			//读取桶首节点存储的第一个节点的偏移量，如果偏移量为0，直接返回EXIT_META_NOT_FOUND_ERROR
 			//根据偏移量读取存储的metaInfo
 			//与key进行比较，相等则设置current_offset和previous_offset
@@ -314,6 +414,15 @@ namespace linux_study{
 				++blockInfo()->file_count;
 				++blockInfo()->seq_no;
 				blockInfo()->size+=modify_size;
+			}else if(oper_type==C_OPER_DELETE){
+				++blockInfo()->version;
+				--blockInfo()->file_count;
+				
+				blockInfo()->size-=modify_size;
+				
+				++blockInfo()->del_file_count;
+				blockInfo()->del_size+=modify_size;
+				
 			}
 			
 			if(debug)printf("Update block info successfully.block_id:%d,version:%d, file count:%d, size:%d,del_file_count:%d,seq_no:%d,del_size:%d,oper_type:%d\n",
@@ -346,6 +455,10 @@ namespace linux_study{
 			return reinterpret_cast<int32_t*>(reinterpret_cast<char*>(file_op->get_map_data())+sizeof(IndexHeader));
 		}
 		
+		int32_t IndexHandle::get_free_head_offset()const{
+			return reinterpret_cast<IndexHeader*>(file_op->get_map_data())->free_head_offset;
+			
+		}
 		bool IndexHandle::hash_compare(const uint64_t left_key,const uint64_t right_key)const{
 			return left_key==right_key;
 		}

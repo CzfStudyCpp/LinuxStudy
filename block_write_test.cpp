@@ -59,10 +59,11 @@ int main(int argc,char **argv){//argc 表示参数数量，argv存放参数 rm -
 	largefile::FileOperation * mainBlock=new largefile::FileOperation(mainBlock_path,O_RDWR|O_LARGEFILE|O_CREAT);
 	
 	char buffer[4096];
-	memset(buffer,'6',sizeof(buffer));
+	memset(buffer,'9',sizeof(buffer));
 	int32_t data_offset=index_handle->get_block_data_offset();
+	printf("The data_offset by the index_handle get is :%d\n",data_offset);
 	uint32_t file_no=index_handle->blockInfo()->seq_no;
-	
+	printf("The file_no by the index_handle get is :%d\n",file_no);
 	if((ret=mainBlock->pwrite_file(buffer,sizeof(buffer),data_offset))!=linux_study::largefile::TFS_SUCCESS){
 		fprintf(stderr,"write to main block failed.ret:%d.reason:%s\n",ret,strerror(errno));
 		mainBlock->close_file();
@@ -104,7 +105,7 @@ int main(int argc,char **argv){//argc 表示参数数量，argv存放参数 rm -
 		fprintf(stderr,"write to mainBlock %d failed.file no %u \n",block_id,file_no);
 	}
 	else{
-		if(debug)printf("write successfully.file_no:%u,block_id:%d",file_no,block_id);
+		if(debug)printf("write successfully.file_no:%u,block_id:%d\n",file_no,block_id);
 	}
 	
 	

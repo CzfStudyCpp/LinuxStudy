@@ -1,0 +1,5 @@
+g++ -g block_remove_test.cpp file_op.cpp index_handle.cpp mmap_file.cpp mmap_file_op.cpp -o block_remove_test
+g++ -g block_read_test.cpp file_op.cpp index_handle.cpp mmap_file.cpp mmap_file_op.cpp -o block_read_test
+g++ -g block_write_test.cpp file_op.cpp index_handle.cpp mmap_file.cpp mmap_file_op.cpp -o block_write_test
+g++ -g block_load_stat.cpp file_op.cpp index_handle.cpp mmap_file.cpp mmap_file_op.cpp -o block_load_stat
+g++ -g block_init_test.cpp file_op.cpp index_handle.cpp mmap_file.cpp mmap_file_op.cpp -o block_init_test

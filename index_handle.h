@@ -52,6 +52,11 @@ namespace linux_study{
 				//向索引文件中写入
 				int write_segment_meta(const uint64_t key,MetaInfo & meta);
 				
+				//读取索引meta
+				int read_segment_meta(const uint64_t key,MetaInfo & meta);
+				
+				//删除索引
+				int remove_segment_meta(const uint64_t key);
                 //哈希查找元信息
 				int hash_find(const uint64_t key,int32_t & current_offset,int32_t& previous_offset);
 				
@@ -60,6 +65,9 @@ namespace linux_study{
 				void commit_block_data_offset(const int file_size);
 				//找到哈希桶的数组的首节点
 				int32_t* bucket_slot();
+				
+				//
+				int32_t get_free_head_offset()const;
 				
 				private:
 				bool hash_compare(const uint64_t left_key,const uint64_t right_key)const;
