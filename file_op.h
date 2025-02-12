@@ -26,12 +26,15 @@ namespace linux_study
 			//直接在当前位置开始写
 			int write_file(const char*buf,const int32_t nbytes);//直接写文件
 			
+			int32_t copy_main_block(FileOperation * old_main_block,std::vector<MetaInfo>&usefulMetaList);
+			int32_t batch_clean_up(std::vector<MetaInfo>&usefulMetaList);
 			int64_t get_file_size();//获取大小
 			int ftruncate_file(const int64_t length);//截断文件
 			int seek_file(const int64_t offset);//移动文件指针到指定位置
 			
 			int get_fd()const;//获取文件句柄
 			
+			int rename_file(const std::string &old_path, const std::string &new_path);//修改文件名
 			protected:
 				int fd;//文件句柄，
 				int open_flags;

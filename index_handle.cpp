@@ -58,10 +58,10 @@ namespace linux_study{
 				indexHeader.index_file_offset=sizeof(IndexHeader)+bucket_size*sizeof(int32_t);//the offset=the indexHeader+the offset of the buckets
 				
 				//indexHeader+total buckets，
-				char* init_data =new char[indexHeader.index_file_offset];//数据信息缓冲
+				char* init_data =new char[indexHeader.index_file_offset+1];//数据信息缓冲
 				memcpy(init_data,&indexHeader,sizeof(indexHeader));//将头部信息复制
-				memset(init_data+sizeof(indexHeader),0,indexHeader.index_file_offset-sizeof(indexHeader));//初始化设置头部之外的空间的信息为0
-			
+				memset(init_data+sizeof(IndexHeader),0,indexHeader.index_file_offset-sizeof(indexHeader));//初始化设置头部之外的空间的信息为0
+			    init_data[indexHeader.index_file_offset]='\0';
 			    //write index header and buckets into index file
 				ret=file_op->pwrite_file(init_data,indexHeader.index_file_offset,0);
 				
@@ -348,8 +348,8 @@ namespace linux_study{
 				ret=file_op->pread_file(reinterpret_cast<char*>(&tmp_metaInfo),sizeof(MetaInfo),previous_offset);
 				
 				if(ret!=linux_study::largefile::TFS_SUCCESS){
-                 fprintf(stderr,"in the inserting meta_info,pread_file fail\n");
-				return ret;
+                  fprintf(stderr,"in the inserting meta_info,pread_file fail\n");
+				  return ret;
 				}
 				
 				tmp_metaInfo.set_next_meta_offset(current_offset);
@@ -361,6 +361,7 @@ namespace linux_study{
 				}
 			}
 			else{
+				////表示第一个节点
 				bucket_slot()[slot]=current_offset;
 			}
 			return linux_study::largefile::TFS_SUCCESS;
@@ -369,6 +370,7 @@ namespace linux_study{
 		}
 		int IndexHandle::hash_find(const uint64_t key,int32_t & current_offset,int32_t& previous_offset){
 		    int ret=linux_study::largefile::TFS_SUCCESS;
+			
 			MetaInfo meta_info;
 			
 			current_offset=0;
@@ -380,27 +382,36 @@ namespace linux_study{
 			//与key进行比较，相等则设置current_offset和previous_offset
 			//否则继续执行,从metaInfo中读取next_meta_offset,，如果偏移量为0，直接返回EXIT_META_NOT_FOUND_ERROR，否则继续读取下一个mate
 			int32_t pos=bucket_slot()[slot];
+			printf("in the hash_find start!,the first slot found by the key:%lu is :%d,with the pos is :%d\n\n",key,slot,pos);
 			for(  ;pos!=0;  ){
 				//读取
 				file_op->pread_file(reinterpret_cast<char*>(&meta_info),sizeof(MetaInfo),pos);
 				//读取失败
 				if(ret!=linux_study::largefile::TFS_SUCCESS){
+					fprintf(stderr,"in the hash_find,read the index meta_info fail\n");
 					return ret;
+				}
+				if(debug){
+					printf("the read meta_info :the file_id is:%lu,the next_meta_offset is :%d,and the file in the main block the info is :the inner_offset in the block is :%d,the file size is:%d",
+					        meta_info.get_file_id(),meta_info.get_next_meta_offset(),meta_info.get_offset(),meta_info.get_size());
 				}
 				//比较hash值是否相等，相等则返回
 				if(hash_compare(key,meta_info.get_key())){
 					current_offset=pos;
+					printf("in the hash_find for if judge find the key successfully!,the first slot found by the key:%lu is :%d,and the needed pos is :%d\n\n",key,slot,pos);
 					return linux_study::largefile::TFS_SUCCESS;
 				}
-				//第二个接待你开始才有前一个offset
+				//第二个节点开始才有前一个offset
 				previous_offset=pos;
 				//往下一个节点移动
 				pos=meta_info.get_next_meta_offset();
+				printf("in the hash_find for continue to find next pos!,the first slot found by the key:%lu is :%d,the previous_offset :%d, the next pos is :%d\n\n",key,slot,previous_offset,pos);
 				
 			}
 			return linux_study::largefile::EXIT_META_NOT_FOUND_ERROR;
 		}
 		
+
 		void IndexHandle::commit_block_data_offset(const int file_size){
 			reinterpret_cast<IndexHeader*>(file_op->get_map_data())->data_file_offset+=file_size;
 		}
@@ -431,6 +442,84 @@ namespace linux_study{
 							);
 			return linux_study::largefile::TFS_SUCCESS;
 			
+		}
+		int32_t IndexHandle::get_meta_list(std::vector<linux_study::largefile::MetaInfo>& meta_list) {
+			int ret = linux_study::largefile::TFS_SUCCESS;
+
+			int32_t previous_offset = 0;
+			int32_t bucket_size_ = bucketSize();
+			for (int i = 0; i < bucket_size_; i++) {
+				// 该槽位为空
+				if (bucket_slot()[i] == 0) continue;
+
+				int32_t pos = bucket_slot()[i];
+				while (pos != 0) {
+					MetaInfo meta; // 修正：在这里添加分号
+					ret = file_op->pread_file(reinterpret_cast<char*>(&meta), sizeof(MetaInfo), pos); // 需要赋值 ret
+
+					// 读取失败
+					if (ret != linux_study::largefile::TFS_SUCCESS) {
+						fprintf(stderr, "in the get_meta_list, read the index meta_info fail\n");
+						return ret;
+					}
+					meta_list.push_back(meta);
+
+					// 第二个节点开始才有前一个offset
+					previous_offset = pos;
+					// 往下一个节点移动
+					pos = meta.get_next_meta_offset(); // 确保此处的 meta 是最新的
+					if (debug) {
+						printf("in the get_meta_list for continue to find next pos!, the slot is: %d, the previous_offset: %d, the next pos is: %d\n\n", i, previous_offset, pos);
+					}
+				}
+			}
+			return linux_study::largefile::TFS_SUCCESS;
+		}
+
+		
+		int32_t IndexHandle::reorder_index(std::vector<MetaInfo>&usefulMetaList){
+			size_t meta_numbers=usefulMetaList.size();
+			reset_the_bucket_slot();
+			//这一步重新设置每个桶的数据信息，以及对应的哈希链表
+			int32_t ret=linux_study::largefile::TFS_SUCCESS;
+			for(auto & meta:usefulMetaList){
+				
+				ret=write_segment_meta(meta.get_file_id(),meta);
+				if(ret!=linux_study::largefile::TFS_SUCCESS){
+					fprintf(stderr,"in reorder_index,write_segment_meta fail with the file_id:%lu,and the RET is :%d\n",meta.get_file_id(),ret);
+					return ret;
+				}
+				//槽位的首节点设置为
+			}
+			int32_t file_count_=usefulMetaList.size();
+			index_header()->data_file_offset=(usefulMetaList[file_count_-1].get_offset()+usefulMetaList[file_count_-1].get_size());
+			blockInfo()->size=index_header()->data_file_offset;
+			blockInfo()->file_count=file_count_;
+			blockInfo()->seq_no=file_count_+1;
+			blockInfo()->version++;
+			file_op->flush_file();
+			if(debug)printf("reorder_index successfully!\n the new data_file_offset is:%d\t,the new index_file_offset is :%d,the free_head_offset is:%d\t"
+			                "the new file_count is :%d\t,new size is:%d\t,new seq_no is:%d\n"
+			         ,index_header()->data_file_offset,index_header()->index_file_offset,index_header()->free_head_offset,
+					 blockInfo()->file_count,blockInfo()->size,blockInfo()->seq_no);
+			return linux_study::largefile::TFS_SUCCESS;
+			
+		}
+	    void IndexHandle::reset_the_bucket_slot(){
+			//将桶的索引信息全部归0
+			int32_t index_bucket_size=(bucketSize()*sizeof(int32_t));
+			char *bucket_data=new char[index_bucket_size+1];
+			memset(bucket_data,0,index_bucket_size);
+			bucket_data[index_bucket_size]='\0';
+			file_op->pwrite_file(bucket_data,index_bucket_size,sizeof(IndexHeader));
+			//索引头可以重置偏移量，数据块偏移量可以后面再修改
+			index_header()->index_file_offset=sizeof(IndexHeader)+bucketSize()*sizeof(int32_t);
+			index_header()->free_head_offset=0;
+			//块信息除了版本号和块id其他都需要进行修改，已删除的文件信息可以重置，其他变量可以在重排索引的时候进行修改
+			blockInfo()->del_file_count=0;
+			blockInfo()->del_size=0;
+			delete bucket_data;
+			bucket_data=nullptr;
 		}
 		IndexHeader* IndexHandle::index_header(){
 			return reinterpret_cast<IndexHeader*>(file_op->get_map_data());

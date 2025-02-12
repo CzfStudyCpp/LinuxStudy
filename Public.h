@@ -12,15 +12,15 @@
 #include<string.h>
 #include<errno.h>
 #include<sys/mman.h>
-#include<unistd.h>
 #include<stdlib.h>
 #include<inttypes.h>
-
+#include<vector>
 #include <cassert>
 namespace linux_study{
 	namespace largefile{
 		
 		const int32_t EXIT_DISK_OPER_INCOMPLETE =-8012;//读写的长度小于要求的长度
+		const int32_t FILE_NAME_EMPTY_ERROR =-8013;
 		const int32_t TFS_SUCCESS=1;//系统文件操作成功
 		const int32_t TFS_ERROR=-1;
 		const int32_t EXIT_INDEX_ALREADY_LOADED_ERROR=-80;//index file is loaded when create or loading
@@ -29,8 +29,10 @@ namespace linux_study{
 		const int32_t EXIT_BLOCKID_CONFLICT_ERROR=-8016; //the index block id is conflict
 		const int32_t EXIT_BUCKET_CONFIGURE_ERROR=-8017; //the bucket size error
 		const int32_t EXIT_BLOCKID_ZERO_ERROR=-8018;
+		const int32_t RENAME_FILE_ERROR=-8019;
 		const int32_t EXIT_INDEX_NOT_LOADED_ERROR=-81; //the index file is not loaded when remove
 		const int32_t EXIT_META_NOT_FOUND_ERROR=-82;
+		const int32_t EXIT_META_USEFUL_META_NULL_ERROR=-83;//the useful file's metas is null
 		
 		enum OperType{
 			
@@ -51,6 +53,7 @@ namespace linux_study{
 		//索引文件和索引块的信息
 		static const std::string MAINBLOCK_DIR_PREFIX="/mainblock/";
 		static const std::string INDEX_DIR_PREFIX="/index/";
+		static const std::string BLOCK_BACKUP="backup_";
 		static const mode_t DIR_MODE=0755;
 		
 		//块的元信息

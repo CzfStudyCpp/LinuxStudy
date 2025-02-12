@@ -13,7 +13,7 @@ const static largefile::MMapOption mmap_option ={1024000,4096,4096};//映射内�
 
 const static uint32_t mainBlockSize=1024*1024*64;//主块文件大小
 
-const static uint32_t bucket_size=1000;//哈希桶的大小
+const static uint32_t bucket_size=2;//哈希桶的大小
 
 static int32_t block_id=1;
 

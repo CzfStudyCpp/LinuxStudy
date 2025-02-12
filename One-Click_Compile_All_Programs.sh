@@ -6,6 +6,7 @@ tests=(
     "block_write_test.cpp"
     "block_load_stat.cpp"
     "block_init_test.cpp"
+    "block_space_cleanup_test.cpp"
 )
 
 # 共享的类文件

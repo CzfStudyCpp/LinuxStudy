@@ -112,7 +112,14 @@ namespace linux_study{
 		
 		int FileOperation::unlink_file(){
 			close_file();
-			return unlink(file_name);
+			int ret=unlink(file_name);
+			if(ret!=0){
+				fprintf(stderr,"remove the file fail with the ret is :%d,and the error desc is :%s\n",ret,strerror(errno));
+				return linux_study::largefile::TFS_ERROR;
+			}
+			else{
+				return linux_study::largefile::TFS_SUCCESS;
+			}
 			//删除文件
 		}
 		
@@ -235,7 +242,107 @@ namespace linux_study{
 			}
 			return linux_study::largefile::TFS_SUCCESS;
 		}
+		int32_t FileOperation::copy_main_block(FileOperation * old_main_block,std::vector<MetaInfo>& usefulMetaList){
+			int32_t file_id_=1;
+			int32_t data_file_offset=0;
+			int32_t ret=linux_study::largefile::TFS_SUCCESS;
 			
+			for(auto &meta:usefulMetaList){
+				int32_t now_data_size=meta.get_size();
+				char buffer[now_data_size+1];
+				buffer[now_data_size]='\0';
+				
+				//从对应的数据偏移读取，承载数据的buffer，文件大小规模size，对应文件在旧数据块中的偏移量
+				ret=old_main_block->pread_file(buffer,now_data_size,meta.get_offset());
+				if (ret != linux_study::largefile::TFS_SUCCESS) {
+				fprintf(stderr, "in copy_main_block, old_main_block read the data fail, the data_size is :%d, the old data_offset is: %d with the ret: %d\n",
+						now_data_size, meta.get_offset(), ret);
+				return ret;
+				}
+
+				
+				//写入新块
+				ret=this->pwrite_file(buffer,now_data_size,data_file_offset);
+				if (ret != linux_study::largefile::TFS_SUCCESS) {
+					fprintf(stderr, "in copy_main_block, old_main_block read the data fail, the data_size is :%d, the old data_offset is: %d with the ret: %d\n",
+							now_data_size, meta.get_offset(), ret);
+					return ret;
+				}
+
+				//更新元信息，数据主块相关的元数据信息是文件的id，数据的偏移量，以及数据大小，在这里数据大小不用修改
+				meta.set_file_id(file_id_++);
+				meta.set_offset(data_file_offset);
+				data_file_offset+=now_data_size;
+					
+			}
+			if(debug)printf("copy the Block with the file_name :%s,the file_count is : %d,the data_file_offset :%d\n"
+			,file_name,file_id_-1,data_file_offset);
+			flush_file();
+			return linux_study::largefile::TFS_SUCCESS;
+			
+		}
+		int32_t FileOperation::batch_clean_up(std::vector<MetaInfo>&usefulMetaList){
+			int32_t file_id_=1;
+			int32_t data_file_offset=0;
+			int32_t ret=linux_study::largefile::TFS_SUCCESS;
+			for(auto &meta:usefulMetaList){
+				int32_t now_data_size=meta.get_size();
+                if(meta.get_offset()==0){
+                  //第一个节点，不需要设置meta
+				  file_id_++;
+				  data_file_offset+=now_data_size;
+				  continue;
+				}				
+                char buffer[now_data_size+1];
+				buffer[now_data_size]='\0';	
+                ret=this->pread_file(buffer,now_data_size,meta.get_offset());
+                if(ret!=linux_study::largefile::TFS_SUCCESS){
+				   fprintf(stderr,"in batch_clean_up pread_file fail!the data_file_offset :%d,data_size:%d, with the ret: %d\n"
+				   ,meta.get_offset(),now_data_size,ret);
+				   return ret;
+				}
+                ret=this->pwrite_file(buffer,now_data_size,data_file_offset);
+				if (ret != linux_study::largefile::TFS_SUCCESS) {
+					fprintf(stderr, "in batch_clean_up, pwrite_file fail, the data_size is :%d, the data_offset is: %d with the ret: %d\n",
+							now_data_size,data_file_offset,ret);
+					return ret;
+				}
+                meta.set_file_id(file_id_++);
+                meta.set_offset(data_file_offset);
+				data_file_offset+=now_data_size;				
+			}
+			if(debug)printf("batch_clean_up Block with the file_name :%s,the file_count is : %d,the data_file_offset :%d\n"
+			,file_name,file_id_-1,data_file_offset);
+			flush_file();
+			return linux_study::largefile::TFS_SUCCESS;
+		}
+		int FileOperation::rename_file(const std::string &old_path, const std::string &new_path) {
+			if (old_path.empty()) {
+				fprintf(stderr, "in rename the old_path is empty\n");
+				return linux_study::largefile::FILE_NAME_EMPTY_ERROR;
+			}
+			if (new_path.empty()) {
+				fprintf(stderr, "in rename the new_path is empty\n");
+				return linux_study::largefile::FILE_NAME_EMPTY_ERROR;
+			}
+			   printf("Renaming file from: %s to: %s\n", new_path.c_str(), old_path.c_str());
+			int ret = std::rename(new_path.c_str(),old_path.c_str());
+			if (ret != 0) {
+				fprintf(stderr, "rename the file fail with the ret: %d, the error desc is: %s\n", ret, strerror(errno));
+				return linux_study::largefile::RENAME_FILE_ERROR;
+			}
+			else{
+				printf("rename the new block successfully!\n");
+			}
+			if (file_name) {
+				free(file_name); // 释放旧的文件名内存
+				file_name = nullptr; // 防止悬空指针
+			}
+			file_name = strdup(new_path.c_str()); // 复制新的文件名到成员变量
+			printf("change the member file_name of the new block successfully!\n");
+			return linux_study::largefile::TFS_SUCCESS;
+		}
+
 		
 	}
 }

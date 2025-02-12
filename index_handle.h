@@ -17,7 +17,7 @@ namespace linux_study{
 			
 			//脏数据标记暂时不用
 			
-			int32_t bucket_size;//the size of the hash bucket
+			int32_t bucket_size;//the size of the hash bucket，for each slot .it stores the key of the slot
 			int32_t data_file_offset;//offset to write next data in block_info (the data offset in the block)
 			int32_t index_file_offset;//the current offset of the index file. offset after:index_header+all buckets 
 			int32_t free_head_offset;//the meta node list that can be reuse
@@ -63,11 +63,17 @@ namespace linux_study{
 				int32_t hash_insert(const uint64_t key,int32_t previous_offset,MetaInfo &meta);
 				
 				void commit_block_data_offset(const int file_size);
+				//重置哈希桶的索引信息
+				void reset_the_bucket_slot();
+				//整理索引信息
+				int32_t reorder_index(std::vector<MetaInfo>&usefulMetaList);
 				//找到哈希桶的数组的首节点
 				int32_t* bucket_slot();
 				
 				//
 				int32_t get_free_head_offset()const;
+				
+				int32_t get_meta_list(std::vector<linux_study::largefile::MetaInfo>&meta_list);
 				
 				private:
 				bool hash_compare(const uint64_t left_key,const uint64_t right_key)const;

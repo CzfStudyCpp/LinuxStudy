@@ -47,14 +47,10 @@ namespace linux_study
 				return msync(data,size,MS_ASYNC)==0;
 			}
 			//没有同步，则不需要执行，也相当于同步了
-			return true;
-			
+			return true;	
 			// 使用msync()系统调用，配合MS_ASYNC标志，异步刷新内存映射区域的修改到磁盘。
-
 			// 异步非阻塞操作，立即返回不等待写入完成。
-
-			// 适用场景：内存映射文件的高效批量更新。
-		
+			// 适用场景：内存映射文件的高效批量更新。	
 		}
 		
 		//文件映射
